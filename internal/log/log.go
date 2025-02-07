@@ -188,6 +188,7 @@ func (l *Log) Reader() io.Reader {
 	readers := make([]io.Reader, len(l.segments))
 	for i, segment := range l.segments {
 		// io.Readerのインターフェース(Read)を実装しているため格納できる
+		// MultiReaderに渡すためにio.originReaderを設けてio.Reader型にしている
 		readers[i] = &originReader{segment.store, 0}
 	}
 	return io.MultiReader(readers...)
@@ -200,7 +201,10 @@ type originReader struct {
 
 func (o *originReader) Read(p []byte) (int, error) {
 	n, err := o.ReadAt(p, o.off)
-	o.off += int64(n) // ???
+	// 大きなファイルの内容を全て読み出す際に、実際のサイズの1/xの読み取りをx回行うことになる
+	// その際に前回の読み取りでどこまで読み取ったかを保存して無駄なく読み取りができるようにしている
+	// もう一度最初から読み込みたい場合はoffを0にしてからこのReadを読み込めばいい
+	o.off += int64(n)
 	return n, err
 }
 
