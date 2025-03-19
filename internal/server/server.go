@@ -2,11 +2,22 @@ package server
 
 import (
 	"context"
+	"strings"
+	"time"
 
 	api "github.com/i0li/proglog/api/v1"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_auth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
+	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
+	grpc_ctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
+
+	"go.opencensus.io/plugin/ocgrpc"
+	"go.opencensus.io/stats/view"
+	"go.opencensus.io/trace"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -36,20 +47,68 @@ func NewGRPCServer(config *Config, grpcOpts ...grpc.ServerOption) (
 	*grpc.Server,
 	error,
 ) {
+	logger := zap.L().Named("server")
+	zapOpts := []grpc_zap.Option{
+		// リクエストを処理した際の処理時間をログのフィールドとして追加
+		grpc_zap.WithDurationField(
+			func(duration time.Duration) zapcore.Field {
+				// durationをナノ秒単位に変換してフィールドに追加
+				return zap.Int64(
+					"grpc.time_ns",
+					duration.Nanoseconds(),
+				)
+			},
+		),
+	}
+
+	// OpenCensusのトレースの設定
+	// AlwaysSampeは全てのリクエストをサンプリングする設定
+	trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
+	// メトリクスを収集するためのを設定
+	// デフォルトのサーバービューでは以下の統計情報を収集
+	// - RPCごとの受信バイト数
+	// - RPCごとの送信バイト数
+	// - レイテンシ
+	// - 完了したRPC
+	err := view.Register(ocgrpc.DefaultServerViews...)
+	if err != nil {
+		return nil, err
+	}
+
+	halfSampler := trace.ProbabilitySampler(0.5)
+	trace.ApplyConfig(trace.Config{
+		// トレース名にProduceという文字が入っていれば必ずトレースする
+		// 入っていない場合は50%の確率でトレースする
+		DefaultSampler: func(p trace.SamplingParameters) trace.SamplingDecision {
+			if strings.Contains(p.Name, "Produce") {
+				return trace.SamplingDecision{Sample: true}
+			}
+			return halfSampler(p)
+		},
+	})
+
 	grpcOpts = append(
 		grpcOpts,
 		// ストリームのリクエストに対してミドルウェア(インターセプタ)を設定
 		grpc.StreamInterceptor(
 			grpc_middleware.ChainStreamServer(
+				grpc_ctxtags.StreamServerInterceptor(),
+				grpc_zap.StreamServerInterceptor(logger, zapOpts...),
 				grpc_auth.StreamServerInterceptor(authenticate),
 			),
 		),
 		// 単一のリクエストに対してミドルウェア(インターセプタ)を設定
 		grpc.UnaryInterceptor(
 			grpc_middleware.ChainUnaryServer(
+				grpc_ctxtags.UnaryServerInterceptor(),
+				grpc_zap.UnaryServerInterceptor(logger, zapOpts...),
 				grpc_auth.UnaryServerInterceptor(authenticate),
 			),
 		),
+		// 統計情報を処理するハンドラに外部ライブラリのハンドラを使用する
+		// grpcにはデフォルトのハンドラもあるが、外部ライブラリのハンドラを指定することで
+		// 外部のトレーシングシステムに送信することができる
+		grpc.StatsHandler(&ocgrpc.ServerHandler{}),
 	)
 	gsrv := grpc.NewServer(grpcOpts...)
 	srv, err := newgrpcServer(config)
