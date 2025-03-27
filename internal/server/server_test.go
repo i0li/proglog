@@ -39,7 +39,7 @@ func TestMain(m *testing.M) {
 		if err != nil {
 			panic(err)
 		}
-		// Goの標準ライブラリのローがをzapのロガーに置き換える
+		// zap.L()で指定したロガーを取得できるため、統一したロギングを行える
 		zap.ReplaceGlobals(logger)
 	}
 	os.Exit(m.Run())

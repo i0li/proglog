@@ -13,3 +13,7 @@
 ### Authorization
 
 ![image](/assets/authorization_process.png)
+
+### Discovery, Replication
+
+![image](/assets/discovery_replication.png)
