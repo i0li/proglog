@@ -252,7 +252,7 @@ type snapshot struct {
 	reader io.Reader
 }
 
-// sinkはraftがスナップショットが書き込まれるところ
+// sinkはfsmがスナップショットを書き込むところ
 func (s *snapshot) Persist(sink raft.SnapshotSink) error {
 	if _, err := io.Copy(sink, s.reader); err != nil {
 		_ = sink.Cancel()
