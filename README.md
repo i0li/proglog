@@ -17,3 +17,9 @@
 ### Discovery, Replication
 
 ![image](/assets/discovery_replication.png)
+
+### consensus
+
+![image](/assets/consensus.png)
+
+[Raft Understandable Distributed Consensus](https://thesecretlivesofdata.com/raft/)

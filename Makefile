@@ -4,7 +4,7 @@ CONFIG_PATH=${HOME}/.proglog
 init:
 	mkdir -p ${CONFIG_PATH}
 
-.PHONEY: gencert
+.PHONY: gencert
 gencert:
 	# ca.pemとca-key.pemの生成
 	cfssl gencert \
@@ -56,11 +56,11 @@ $(CONFIG_PATH)/policy.csv:
 
 # -raceはデータ競合が発生していないかを検出するためのフラグ
 # データ競合:複数のゴールーチンが同じメモリ領域に同時にアクセスすること
-.PHONEY: test
+.PHONY: test
 test: $(CONFIG_PATH)/policy.csv $(CONFIG_PATH)/model.conf
 	go test -race ./...
 
-.PHONEY: compile
+.PHONY: compile
 compile:
 	protoc api/v1/*.proto \
 		--go_out=. \
