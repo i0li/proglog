@@ -14,8 +14,8 @@ func SetupTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 		//　自身を証明する証明証のリスト
 		tlsConfig.Certificates = make([]tls.Certificate, 1)
 		tlsConfig.Certificates[0], err = tls.LoadX509KeyPair(
-			cfg.CertFile, //公開鍵証明書(公開鍵も含まれる)
-			cfg.KeyFile,  //秘密鍵
+			cfg.CertFile, // 公開鍵証明書(公開鍵も含まれる)
+			cfg.KeyFile,  // 秘密鍵
 		)
 		if err != nil {
 			return nil, err

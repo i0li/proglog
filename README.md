@@ -23,3 +23,7 @@
 ![image](/assets/consensus.png)
 
 [Raft Understandable Distributed Consensus](https://thesecretlivesofdata.com/raft/)
+
+### client side load balance
+
+![image](/assets/client_side_loadbalance.png)

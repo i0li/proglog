@@ -26,8 +26,9 @@ import (
 )
 
 type Config struct {
-	CommitLog  CommitLog
-	Authorizer Authorizer
+	CommitLog   CommitLog
+	Authorizer  Authorizer
+	GetServerer GetServerer
 }
 
 const (
@@ -187,8 +188,8 @@ func (s *grpcServer) ConsumeStream(
 			switch err.(type) {
 			case nil:
 			case api.ErrOffsetOutOfRange:
-				//この場合ずっとこのfor文は繰り返される
-				//新しくレコードが追加されreqのoffsetと合致した場合のにforからbreakする
+				// この場合ずっとこのfor文は繰り返される
+				// 新しくレコードが追加されreqのoffsetと合致した場合のにforからbreakする
 				continue
 			default:
 				return err
@@ -199,6 +200,20 @@ func (s *grpcServer) ConsumeStream(
 			req.Offset++
 		}
 	}
+}
+
+func (s *grpcServer) GetServers(
+	ctx context.Context, req *api.GetServersRequest,
+) (*api.GetServersResponse, error) {
+	servers, err := s.GetServerer.GetServers()
+	if err != nil {
+		return nil, err
+	}
+	return &api.GetServersResponse{Servers: servers}, nil
+}
+
+type GetServerer interface {
+	GetServers() ([]*api.Server, error)
 }
 
 type CommitLog interface {

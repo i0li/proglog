@@ -11,6 +11,7 @@ import (
 	api "github.com/i0li/proglog/api/v1"
 	"github.com/i0li/proglog/internal/agent"
 	"github.com/i0li/proglog/internal/config"
+	"github.com/i0li/proglog/internal/loadbalance"
 	"github.com/stretchr/testify/require"
 	"github.com/travisjeffery/go-dynaport"
 	"google.golang.org/grpc"
@@ -93,6 +94,10 @@ func TestAgent(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
+
+	// レプリケーションが完了するまで待つ
+	time.Sleep(3 * time.Second)
+
 	consumeResponse, err := leaderClient.Consume(
 		context.Background(),
 		&api.ConsumeRequest{
@@ -101,9 +106,6 @@ func TestAgent(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.Equal(t, consumeResponse.Record.Value, []byte("foo"))
-
-	// レプリケーションが完了するまで待つ
-	time.Sleep(3 * time.Second)
 
 	// 別のノードがレコードを複製したかどうかをテスト
 	followerClient := client(t, agents[1], peerTLSConfig)
@@ -155,7 +157,15 @@ func client(
 	rpcAddr, err := agent.Config.RPCAddr()
 	require.NoError(t, err)
 
-	conn, err := grpc.Dial(rpcAddr, opts...)
+	// <scheme>:///<endpoint>の形にするとschemeと一致するresolverが選択される
+	// 今回はresolver.Schemeで定義している
+	// アドレスだけの場合はデフォルトのresolverが選択される
+	// https://stackoverflow.com/questions/58956544/what-is-r-scheme-test-server-in-grpc-dial-call-in-all-grpc-test-cases
+	conn, err := grpc.Dial(fmt.Sprintf(
+		"%s:///%s",
+		loadbalance.Name,
+		rpcAddr, // resolver.target.endpointに渡される
+	), opts...)
 	require.NoError(t, err)
 
 	client := api.NewLogClient(conn)
